@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Super Finger Plumber 3D</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-1: #050814;
+      --bg-2: #0f2238;
+      --panel: rgba(10, 18, 34, 0.78);
+      --line: rgba(128, 181, 255, 0.2);
+      --text: #eef4ff;
+      --accent: #7bc2ff;
+      --good: #7dff8f;
+      --bad: #ff7d7d;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      touch-action: none;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(68, 122, 255, 0.12), transparent 35%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    }
+    #gameRoot {
+      position: fixed;
+      inset: 0;
+    }
+    #hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 6;
+      pointer-events: none;
+      color: var(--text);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      backdrop-filter: blur(4px);
+      pointer-events: auto;
+    }
+    .title {
+      font-size: 1rem;
+      margin: 0 0 4px;
+      letter-spacing: 0.04em;
+    }
+    .meta {
+      margin: 0;
+      font-size: 0.82rem;
+      opacity: 0.9;
+    }
+    .stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .stat {
+      min-width: 88px;
+      text-align: center;
+      padding: 8px 9px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 0.78rem;
+    }
+    .stat strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 1rem;
+      letter-spacing: 0.03em;
+    }
+    #centerCard {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(92vw, 540px);
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(9, 19, 35, 0.85);
+      color: var(--text);
+      text-align: center;
+      z-index: 8;
+    }
+    #centerCard h2 {
+      margin: 0 0 8px;
+      font-size: 1.4rem;
+      letter-spacing: 0.02em;
+    }
+    #centerCard p {
+      margin: 0 0 12px;
+      opacity: 0.93;
+      line-height: 1.36;
+    }
+    .btnRow {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    button {
+      min-height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--text);
+      padding: 8px 14px;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #04101f;
+      border-color: transparent;
+      font-weight: 700;
+    }
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    #controls {
+      position: fixed;
+      inset: 0;
+      z-index: 7;
+      pointer-events: none;
+    }
+    #joyBase {
+      position: absolute;
+      left: 16px;
+      bottom: 20px;
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      background: rgba(8, 15, 28, 0.38);
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #joyKnob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 56px;
+      height: 56px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.28);
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      pointer-events: none;
+    }
+    #jumpBtn {
+      position: absolute;
+      right: 20px;
+      bottom: 28px;
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: rgba(123, 194, 255, 0.36);
+      color: #04101f;
+      font-weight: 700;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #modeButtons {
+      position: fixed;
+      right: 12px;
+      bottom: 138px;
+      z-index: 7;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #modeButtons button {
+      min-height: 38px;
+      font-size: 0.86rem;
+      background: rgba(10, 22, 38, 0.72);
+    }
+    #modeStatus {
+      color: var(--good);
+      font-weight: 700;
+    }
+    #camPreview {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      width: 160px;
+      height: 96px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      z-index: 7;
+      display: none;
+      transform: scaleX(-1);
+      background: #000;
+    }
+    @media (max-width: 760px) {
+      #hud {
+        flex-direction: column;
+      }
+      .stats {
+        justify-content: flex-start;
+      }
+      #modeButtons {
+        right: 12px;
+        bottom: 132px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="gameRoot"></div>
+
+  <div id="hud">
+    <section class="panel">
+      <h1 class="title">Super Finger Plumber 3D</h1>
+      <p class="meta">Play with touch, finger tracking, or TV remote controls. Jump over enemies and blocks.</p>
+    </section>
+    <section class="panel stats">
+      <div class="stat">Coins<strong id="coins">0</strong></div>
+      <div class="stat">Lives<strong id="lives">3</strong></div>
+      <div class="stat">Distance<strong id="distance">0m</strong></div>
+      <div class="stat">Level<strong id="levelNum">1/100</strong></div>
+      <div class="stat">Time<strong id="timeSpent">00:00</strong></div>
+      <div class="stat">Mode<strong id="modeStatus">Touch</strong></div>
+    </section>
+  </div>
+
+  <div id="controls">
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <button id="jumpBtn" type="button">JUMP</button>
+  </div>
+
+  <div id="modeButtons">
+    <button id="changeModeBtn" type="button">Change Mode</button>
+    <button id="magnetBtn" type="button">Magnet: Ready</button>
+    <button id="restartBtn" type="button">Restart</button>
+  </div>
+
+  <video id="camPreview" autoplay playsinline muted></video>
+
+  <div id="modePicker" style="position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:rgba(5,12,24,0.72);padding:14px;">
+    <section class="panel" style="max-width:min(94vw,540px);text-align:center;">
+      <h2 style="margin:0 0 8px;">Select Control Mode</h2>
+      <p style="margin:0 0 12px;opacity:.92;">Choose how you want to control the game.</p>
+      <div class="btnRow">
+        <button id="pickTouchBtn" class="primary" type="button">Touch Mode</button>
+        <button id="pickHandBtn" type="button">Finger Tracking Mode</button>
+        <button id="pickTvBtn" type="button">TV Remote Mode</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="centerCard">
+    <h2>Ready to Run</h2>
+    <p>Beat all 100 levels, collect coins, and keep surviving as each level gets harder and longer.</p>
+    <div class="btnRow">
+      <button id="startBtn" class="primary" type="button">Start Game</button>
+    </div>
+  </div>
+
+  <script>
+    const MAX_LEVELS = 100;
+    const BASE_LEVEL_LENGTH = 1200;
+    const LEVEL_LENGTH_STEP = 60;
+    const MAX_LEVEL_LENGTH = BASE_LEVEL_LENGTH + (MAX_LEVELS - 1) * LEVEL_LENGTH_STEP;
+    const LANE_LIMIT = 7;
+
+    const root = document.getElementById("gameRoot");
+    const coinsEl = document.getElementById("coins");
+    const livesEl = document.getElementById("lives");
+    const distanceEl = document.getElementById("distance");
+    const levelNumEl = document.getElementById("levelNum");
+    const timeSpentEl = document.getElementById("timeSpent");
+    const modeStatusEl = document.getElementById("modeStatus");
+    const centerCard = document.getElementById("centerCard");
+    const restartBtn = document.getElementById("restartBtn");
+    const magnetBtn = document.getElementById("magnetBtn");
+    const changeModeBtn = document.getElementById("changeModeBtn");
+    const camPreview = document.getElementById("camPreview");
+    const modePicker = document.getElementById("modePicker");
+    const pickTouchBtn = document.getElementById("pickTouchBtn");
+    const pickHandBtn = document.getElementById("pickHandBtn");
+    const pickTvBtn = document.getElementById("pickTvBtn");
+
+    const joyBase = document.getElementById("joyBase");
+    const joyKnob = document.getElementById("joyKnob");
+    const jumpBtn = document.getElementById("jumpBtn");
+    let audioCtx = null;
+    let bgMasterGain = null;
+    let bgMusicTimer = null;
+    let bgMusicStep = 0;
+    let bgMusicNextTime = 0;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x081224, 36, 230);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 7, -10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    root.appendChild(renderer.domElement);
+
+    const hemi = new THREE.HemisphereLight(0xcde8ff, 0x12243b, 1.0);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.12);
+    sun.position.set(8, 18, -6);
+    sun.castShadow = false;
+    scene.add(hemi, sun);
+
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x274a34, roughness: 0.95, metalness: 0.02 });
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0x4f5f78, roughness: 0.9 });
+    const blockMat = new THREE.MeshStandardMaterial({ color: 0xbc6f2f, roughness: 0.85 });
+    const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd84c, emissive: 0x735600, emissiveIntensity: 0.35, metalness: 0.7, roughness: 0.3 });
+    const shellMat = new THREE.MeshStandardMaterial({ color: 0x2f7746, roughness: 0.84 });
+    const skinEnemyMat = new THREE.MeshStandardMaterial({ color: 0xb5cf8a, roughness: 0.9 });
+    const footEnemyMat = new THREE.MeshStandardMaterial({ color: 0x6a7e4a, roughness: 0.95 });
+    const castleMat = new THREE.MeshStandardMaterial({ color: 0xdad8e8, roughness: 0.82 });
+
+    const world = new THREE.Group();
+    scene.add(world);
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(40, 1, MAX_LEVEL_LENGTH + 220), groundMat);
+    floor.position.set(0, -0.5, MAX_LEVEL_LENGTH / 2 - 10);
+    world.add(floor);
+
+    const road = new THREE.Mesh(new THREE.BoxGeometry(14, 0.2, MAX_LEVEL_LENGTH + 220), pathMat);
+    road.position.set(0, 0.1, MAX_LEVEL_LENGTH / 2 - 10);
+    world.add(road);
+
+    const clouds = new THREE.Group();
+    scene.add(clouds);
+    for (let i = 0; i < 28; i++) {
+      const cloud = new THREE.Mesh(
+        new THREE.SphereGeometry(1.5 + Math.random() * 1.8, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.75 })
+      );
+      cloud.position.set((Math.random() - 0.5) * 90, 14 + Math.random() * 9, Math.random() * (MAX_LEVEL_LENGTH + 180) - 40);
+      cloud.scale.set(1.4 + Math.random(), 0.75 + Math.random() * 0.4, 1.2 + Math.random());
+      clouds.add(cloud);
+    }
+
+    function createPlumber() {
+      const g = new THREE.Group();
+
+      const skin = new THREE.MeshStandardMaterial({ color: 0xffc59f, roughness: 0.75 });
+      const red = new THREE.MeshStandardMaterial({ color: 0xdd2f2f, roughness: 0.78 });
+      const blue = new THREE.MeshStandardMaterial({ color: 0x2f57d8, roughness: 0.82 });
+      const brown = new THREE.MeshStandardMaterial({ color: 0x5e3b1d, roughness: 0.9 });
+      const black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.92 });
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 0.95), blue);
+      body.position.y = 1.7;
+
+      const belly = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.1, 0.98), blue);
+      belly.position.y = 1.2;
+
+      const chest = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.5, 1), red);
+      chest.position.y = 2.1;
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.56, 18, 16), skin);
+      head.position.y = 2.92;
+
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), skin);
+      nose.position.set(0, 2.82, 0.52);
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.65, 0.35, 18), red);
+      cap.position.y = 3.26;
+
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.11, 0.34), red);
+      brim.position.set(0, 3.1, 0.48);
+
+      const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.12), black);
+      mustache.position.set(0, 2.67, 0.5);
+
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.0, 0.32), red);
+      const armR = armL.clone();
+      armL.position.set(-0.92, 1.7, 0);
+      armR.position.set(0.92, 1.7, 0);
+
+      const gloveL = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      const gloveR = gloveL.clone();
+      gloveL.position.set(-0.92, 1.12, 0);
+      gloveR.position.set(0.92, 1.12, 0);
+
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.92, 0.4), blue);
+      const legR = legL.clone();
+      legL.position.set(-0.3, 0.45, 0);
+      legR.position.set(0.3, 0.45, 0);
+
+      const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.25, 0.74), brown);
+      const shoeR = shoeL.clone();
+      shoeL.position.set(-0.3, 0.05, 0.12);
+      shoeR.position.set(0.3, 0.05, 0.12);
+
+      g.add(body, belly, chest, head, nose, cap, brim, mustache, armL, armR, gloveL, gloveR, legL, legR, shoeL, shoeR);
+      g.userData = { armL, armR, legL, legR, shoeL, shoeR };
+      g.position.set(0, 0, 0);
+      return g;
+    }
+
+    const player = createPlumber();
+    world.add(player);
+
+    const castle = new THREE.Group();
+    const cBase = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 6), castleMat);
+    cBase.position.y = 2.5;
+    const cGate = new THREE.Mesh(new THREE.BoxGeometry(2, 3.2, 0.4), new THREE.MeshStandardMaterial({ color: 0x6f5c43 }));
+    cGate.position.set(0, 1.6, 3.1);
+    castle.add(cBase, cGate);
+    castle.position.set(0, 0, BASE_LEVEL_LENGTH + 12);
+    world.add(castle);
+
+    const coins = [];
+    const enemies = [];
+    const blocks = [];
+    const deco = [];
+
+    function addCoin(x, y, z) {
+      const coin = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.16, 12, 20), coinMat);
+      coin.rotation.x = Math.PI / 2;
+      coin.position.set(x, y, z);
+      coin.userData = { collected: false };
+      world.add(coin);
+      coins.push(coin);
+    }
+
+    function addEnemy(x, z) {
+      const g = new THREE.Group();
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.58, 16, 14), shellMat);
+      shell.scale.set(1, 0.78, 1.16);
+      shell.position.y = 0.74;
+
+      const belly = new THREE.Mesh(new THREE.SphereGeometry(0.44, 14, 12), skinEnemyMat);
+      belly.scale.set(1, 0.7, 1.05);
+      belly.position.y = 0.52;
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), skinEnemyMat);
+      head.position.set(0, 0.62, 0.62);
+
+      const legFL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.24, 10), footEnemyMat);
+      const legFR = legFL.clone();
+      const legBL = legFL.clone();
+      const legBR = legFL.clone();
+      legFL.position.set(-0.28, 0.22, 0.32);
+      legFR.position.set(0.28, 0.22, 0.32);
+      legBL.position.set(-0.28, 0.22, -0.34);
+      legBR.position.set(0.28, 0.22, -0.34);
+
+      g.add(shell, belly, head, legFL, legFR, legBL, legBR);
+      g.position.set(x, 0, z);
+      g.userData = {
+        dir: Math.random() > 0.5 ? 1 : -1,
+        speed: 1.05 + Math.random() * 0.45,
+        dead: false,
+        phase: Math.random() * Math.PI * 2,
+        head,
+        shell,
+        legs: [legFL, legFR, legBL, legBR]
+      };
+      world.add(g);
+      enemies.push(g);
+    }
+
+    function addBlock(x, z, h = 1) {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(1.3, h, 1.3), blockMat);
+      block.position.set(x, h / 2, z);
+      block.userData = { broken: false, h };
+      world.add(block);
+      blocks.push(block);
+    }
+
+    function addTree(x, z) {
+      const t = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.9, 10), new THREE.MeshStandardMaterial({ color: 0x6f3f1f }));
+      trunk.position.y = 0.95;
+      const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.05, 14, 12), new THREE.MeshStandardMaterial({ color: 0x2fa94c }));
+      leaves.position.y = 2.3;
+      t.add(trunk, leaves);
+      t.position.set(x, 0, z);
+      world.add(t);
+      deco.push(t);
+    }
+
+    function getLevelLength(level) {
+      return BASE_LEVEL_LENGTH + (level - 1) * LEVEL_LENGTH_STEP;
+    }
+
+    function clearLevelObjects() {
+      for (const item of coins) world.remove(item);
+      for (const item of enemies) world.remove(item);
+      for (const item of blocks) world.remove(item);
+      for (const item of deco) world.remove(item);
+      coins.length = 0;
+      enemies.length = 0;
+      blocks.length = 0;
+      deco.length = 0;
+    }
+
+    function generateLevel(level, levelLength) {
+      const step = Math.max(9, 14 - Math.floor(level / 10));
+      const coinChance = Math.max(0.5, 0.74 - level * 0.002);
+      const blockChance = Math.min(0.78, 0.36 + level * 0.0048);
+      const enemyChance = Math.min(0.72, 0.2 + level * 0.0053);
+      const treeChance = Math.max(0.25, 0.52 - level * 0.0018);
+      const bonusCoins = 36 + Math.floor(level * 0.9);
+
+      for (let z = 20; z < levelLength; z += step) {
+        if (Math.random() < coinChance) {
+          addCoin((Math.random() - 0.5) * 8, 1.1 + Math.random() * 1.8, z + (Math.random() - 0.5) * 4);
+        }
+        if (Math.random() < blockChance) {
+          const h = Math.random() < 0.22 + Math.min(0.35, level * 0.003) ? 2 : 1;
+          addBlock((Math.random() - 0.5) * 8, z + 2 + Math.random() * 5, h);
+        }
+        if (Math.random() < enemyChance) {
+          addEnemy((Math.random() - 0.5) * 8, z + 4);
+          if (Math.random() < Math.min(0.28, level * 0.0028)) {
+            addEnemy((Math.random() - 0.5) * 8, z + 7 + Math.random() * 3);
+          }
+        }
+        if (Math.random() < treeChance) {
+          addTree((Math.random() > 0.5 ? 1 : -1) * (9 + Math.random() * 8), z + Math.random() * 11);
+        }
+      }
+      for (let i = 0; i < bonusCoins; i++) {
+        addCoin((Math.random() - 0.5) * 8, 1 + Math.random() * 2.2, 30 + i * (18 + Math.random() * 10));
+      }
+    }
+
+    const game = {
+      running: false,
+      ended: false,
+      won: false,
+      mode: "touch",
+      currentLevel: 1,
+      levelLength: getLevelLength(1),
+      scoreCoins: 0,
+      lives: 3,
+      speedZ: 8.2,
+      moveX: 0,
+      targetX: 0,
+      vy: 0,
+      onGround: true,
+      canJumpAt: 0,
+      damageCooldownUntil: 0,
+      handActive: false,
+      magnetActiveUntil: 0,
+      magnetReadyAt: 0,
+      totalRunMs: 0,
+      lastRunTick: 0,
+      handSensitivity: 1.9
+    };
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    function playTone(freq, duration, type = "sine", volume = 0.05, delay = 0) {
+      const ac = ensureAudio();
+      if (!ac) return;
+      const t0 = ac.currentTime + delay;
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.03);
+    }
+
+    function midiToFreq(midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    function synthNote(freq, start, duration, type, volume) {
+      const ac = ensureAudio();
+      if (!ac || !bgMasterGain) return;
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      osc.connect(gain);
+      gain.connect(bgMasterGain);
+      osc.start(start);
+      osc.stop(start + duration + 0.03);
+    }
+
+    function playKick(start) {
+      const ac = ensureAudio();
+      if (!ac || !bgMasterGain) return;
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(160, start);
+      osc.frequency.exponentialRampToValueAtTime(48, start + 0.11);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.24, start + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+      osc.connect(gain);
+      gain.connect(bgMasterGain);
+      osc.start(start);
+      osc.stop(start + 0.14);
+    }
+
+    function playSnare(start) {
+      const ac = ensureAudio();
+      if (!ac || !bgMasterGain) return;
+      const buffer = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.12), ac.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      const noise = ac.createBufferSource();
+      const filter = ac.createBiquadFilter();
+      const gain = ac.createGain();
+      filter.type = "highpass";
+      filter.frequency.setValueAtTime(1400, start);
+      noise.buffer = buffer;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.13, start + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(bgMasterGain);
+      noise.start(start);
+      noise.stop(start + 0.11);
+    }
+
+    function playHat(start) {
+      const ac = ensureAudio();
+      if (!ac || !bgMasterGain) return;
+      const buffer = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.03), ac.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ac.createBufferSource();
+      const filter = ac.createBiquadFilter();
+      const gain = ac.createGain();
+      filter.type = "highpass";
+      filter.frequency.setValueAtTime(5000, start);
+      noise.buffer = buffer;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.05, start + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.03);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(bgMasterGain);
+      noise.start(start);
+      noise.stop(start + 0.04);
+    }
+
+    function scheduleMusicStep(stepIndex, stepTime) {
+      const melody = [76, 79, 83, 88, 83, 79, 76, 74, 72, 74, 76, 79, 81, 79, 76, 74];
+      const bass = [40, 40, 43, 43, 38, 38, 35, 35];
+      if (stepIndex % 4 === 0 || stepIndex === 10) playKick(stepTime);
+      if (stepIndex % 8 === 4 || stepIndex === 14) playSnare(stepTime);
+      if (stepIndex % 2 === 1) playHat(stepTime);
+
+      const bassNote = bass[Math.floor(stepIndex / 2) % bass.length];
+      synthNote(midiToFreq(bassNote), stepTime, 0.19, "square", 0.06);
+
+      if (stepIndex % 2 === 0) {
+        const note = melody[stepIndex % melody.length];
+        synthNote(midiToFreq(note), stepTime + 0.005, 0.14, "triangle", 0.08);
+      }
+    }
+
+    function startGameplaySound() {
+      const ac = ensureAudio();
+      if (!ac || bgMusicTimer) return;
+      bgMasterGain = ac.createGain();
+      bgMasterGain.gain.setValueAtTime(0.0001, ac.currentTime);
+      bgMasterGain.gain.exponentialRampToValueAtTime(0.32, ac.currentTime + 0.45);
+      bgMasterGain.connect(ac.destination);
+      bgMusicStep = 0;
+      bgMusicNextTime = ac.currentTime + 0.05;
+      const stepDur = 60 / 168 / 2;
+      bgMusicTimer = setInterval(() => {
+        if (!audioCtx || !bgMasterGain) return;
+        while (bgMusicNextTime < audioCtx.currentTime + 0.18) {
+          scheduleMusicStep(bgMusicStep % 16, bgMusicNextTime);
+          bgMusicStep += 1;
+          bgMusicNextTime += stepDur;
+        }
+      }, 40);
+    }
+
+    function stopGameplaySound() {
+      if (!audioCtx || !bgMasterGain) {
+        if (bgMusicTimer) {
+          clearInterval(bgMusicTimer);
+          bgMusicTimer = null;
+        }
+        return;
+      }
+      if (bgMusicTimer) {
+        clearInterval(bgMusicTimer);
+        bgMusicTimer = null;
+      }
+      const t = audioCtx.currentTime;
+      bgMasterGain.gain.cancelScheduledValues(t);
+      bgMasterGain.gain.setValueAtTime(Math.max(0.0001, bgMasterGain.gain.value), t);
+      bgMasterGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      setTimeout(() => {
+        if (bgMasterGain) {
+          try { bgMasterGain.disconnect(); } catch (_e) {}
+        }
+        bgMasterGain = null;
+      }, 320);
+    }
+
+    function playModeSound(mode) {
+      if (mode === "touch") {
+        playTone(420, 0.12, "triangle", 0.045, 0);
+        playTone(560, 0.14, "triangle", 0.045, 0.1);
+      } else if (mode === "hand") {
+        playTone(330, 0.1, "sine", 0.05, 0);
+        playTone(520, 0.1, "sine", 0.05, 0.09);
+        playTone(760, 0.12, "sine", 0.05, 0.18);
+      } else if (mode === "tv") {
+        playTone(300, 0.1, "square", 0.04, 0);
+        playTone(300, 0.1, "square", 0.04, 0.11);
+        playTone(480, 0.12, "square", 0.04, 0.22);
+      }
+    }
+
+    function playActionSound(kind) {
+      if (kind === "jump") playTone(690, 0.08, "triangle", 0.04);
+      else if (kind === "coin") {
+        playTone(780, 0.07, "triangle", 0.04, 0);
+        playTone(980, 0.09, "triangle", 0.04, 0.06);
+      } else if (kind === "enemy") {
+        playTone(220, 0.08, "square", 0.05, 0);
+        playTone(330, 0.09, "square", 0.05, 0.07);
+      }
+      else if (kind === "magnet") {
+        playTone(520, 0.08, "sine", 0.05, 0);
+        playTone(760, 0.1, "sine", 0.05, 0.08);
+      } else if (kind === "win") {
+        playTone(520, 0.12, "triangle", 0.05, 0);
+        playTone(700, 0.12, "triangle", 0.05, 0.12);
+        playTone(920, 0.18, "triangle", 0.05, 0.24);
+      } else if (kind === "lose") {
+        playTone(320, 0.12, "sawtooth", 0.05, 0);
+        playTone(220, 0.2, "sawtooth", 0.05, 0.13);
+      }
+    }
+
+    function collectCoin(coin) {
+      if (!coin.visible || coin.userData.collected) return;
+      coin.userData.collected = true;
+      coin.visible = false;
+      game.scoreCoins += 1;
+      playActionSound("coin");
+    }
+
+    function updateMagnetButton(now = performance.now()) {
+      if (now < game.magnetActiveUntil) {
+        const left = ((game.magnetActiveUntil - now) / 1000).toFixed(1);
+        magnetBtn.textContent = "Magnet: ON " + left + "s";
+        magnetBtn.disabled = true;
+        return;
+      }
+      if (now < game.magnetReadyAt) {
+        const left = Math.ceil((game.magnetReadyAt - now) / 1000);
+        magnetBtn.textContent = "Magnet: " + left + "s";
+        magnetBtn.disabled = true;
+        return;
+      }
+      magnetBtn.textContent = "Magnet: Ready";
+      magnetBtn.disabled = false;
+    }
+
+    function activateMagnet() {
+      const now = performance.now();
+      if (!game.running || game.ended) return;
+      if (now < game.magnetReadyAt || now < game.magnetActiveUntil) return;
+      game.magnetActiveUntil = now + 10000;
+      game.magnetReadyAt = now + 30000;
+      updateMagnetButton(now);
+      playActionSound("magnet");
+    }
+
+    function updateHud() {
+      const totalSec = Math.floor(game.totalRunMs / 1000);
+      const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+      const ss = String(totalSec % 60).padStart(2, "0");
+      coinsEl.textContent = String(game.scoreCoins);
+      livesEl.textContent = String(game.lives);
+      distanceEl.textContent = Math.max(0, Math.floor(player.position.z)) + "/" + game.levelLength + "m";
+      levelNumEl.textContent = game.currentLevel + "/" + MAX_LEVELS;
+      timeSpentEl.textContent = mm + ":" + ss;
+      if (game.mode === "touch") {
+        modeStatusEl.textContent = "Touch";
+        modeStatusEl.style.color = "#7dff8f";
+      } else if (game.mode === "tv") {
+        modeStatusEl.textContent = "TV Remote";
+        modeStatusEl.style.color = "#7dff8f";
+      } else {
+        modeStatusEl.textContent = game.handActive ? "Finger Camera" : "Searching...";
+        modeStatusEl.style.color = game.handActive ? "#7dff8f" : "#ffd148";
+      }
+    }
+
+    function syncControlVisibility() {
+      const isTouch = game.mode === "touch";
+      joyBase.style.display = isTouch ? "block" : "none";
+      jumpBtn.style.display = isTouch ? "block" : "none";
+    }
+
+    function loadLevel(level, keepProgress) {
+      clearLevelObjects();
+      game.currentLevel = Math.max(1, Math.min(MAX_LEVELS, level));
+      game.levelLength = getLevelLength(game.currentLevel);
+      game.speedZ = 7.6 + game.currentLevel * 0.11;
+      game.running = false;
+      game.ended = false;
+      game.won = false;
+      game.lives = 3;
+      game.moveX = 0;
+      game.targetX = 0;
+      game.vy = 0;
+      game.onGround = true;
+      game.canJumpAt = 0;
+      game.damageCooldownUntil = 0;
+      game.magnetActiveUntil = 0;
+      game.magnetReadyAt = 0;
+      game.lastRunTick = 0;
+      if (!keepProgress) {
+        game.scoreCoins = 0;
+        game.totalRunMs = 0;
+      }
+      if (game.mode === "touch") {
+        refreshKeyboardMove();
+      } else {
+        game.moveX = 0;
+      }
+      syncControlVisibility();
+      player.position.set(0, 0, 0);
+      player.rotation.set(0, 0, 0);
+      castle.position.z = game.levelLength + 12;
+      generateLevel(game.currentLevel, game.levelLength);
+
+      centerCard.style.display = "block";
+      centerCard.innerHTML = "<h2>Level " + game.currentLevel + " / " + MAX_LEVELS + "</h2><p>Reach the castle at " + game.levelLength + "m. Difficulty increases every level.</p><div class='btnRow'><button id='startBtn' class='primary' type='button'>Start Level</button></div>";
+      document.getElementById("startBtn").addEventListener("click", startGame);
+      updateHud();
+      updateMagnetButton(0);
+    }
+
+    function resetGame() {
+      loadLevel(1, false);
+    }
+
+    function showGameOverCard() {
+      centerCard.style.display = "block";
+      centerCard.innerHTML = "<h2 style='color:#ff8b8b;'>Game Over</h2><p>You were defeated on Level " + game.currentLevel + ". Choose Replay Level or restart from Level 1.</p><div class='btnRow'><button id='replayLevelBtn' class='primary' type='button'>Replay Level</button><button id='restartAllBtn' type='button'>Restart Game</button></div>";
+      document.getElementById("replayLevelBtn").addEventListener("click", () => loadLevel(game.currentLevel, true));
+      document.getElementById("restartAllBtn").addEventListener("click", () => resetGame());
+    }
+
+    function showLevelCompleteCard() {
+      centerCard.style.display = "block";
+      if (game.currentLevel < MAX_LEVELS) {
+        centerCard.innerHTML = "<h2 style='color:#9cff9a;'>Level " + game.currentLevel + " Complete</h2><p>Coins: " + game.scoreCoins + ". Ready for harder Level " + (game.currentLevel + 1) + "?</p><div class='btnRow'><button id='nextLevelBtn' class='primary' type='button'>Next Level</button><button id='replayLevelBtn' type='button'>Replay Level</button></div>";
+        document.getElementById("nextLevelBtn").addEventListener("click", () => loadLevel(game.currentLevel + 1, true));
+        document.getElementById("replayLevelBtn").addEventListener("click", () => loadLevel(game.currentLevel, true));
+      } else {
+        centerCard.innerHTML = "<h2 style='color:#9cff9a;'>All 100 Levels Complete</h2><p>Total Coins: " + game.scoreCoins + " in " + timeSpentEl.textContent + ". Incredible run.</p><div class='btnRow'><button id='replayLevelBtn' class='primary' type='button'>Replay Level 100</button><button id='restartAllBtn' type='button'>Restart Game</button></div>";
+        document.getElementById("replayLevelBtn").addEventListener("click", () => loadLevel(game.currentLevel, true));
+        document.getElementById("restartAllBtn").addEventListener("click", () => resetGame());
+      }
+    }
+
+    function startGame() {
+      centerCard.style.display = "none";
+      game.running = true;
+      game.ended = false;
+      game.won = false;
+      game.lastRunTick = performance.now();
+      updateMagnetButton(performance.now());
+      startGameplaySound();
+    }
+
+    function jump() {
+      const now = performance.now();
+      if (!game.running || game.ended) return;
+      if (game.onGround && now >= game.canJumpAt) {
+        game.vy = 10.6;
+        game.onGround = false;
+        game.canJumpAt = now + 120;
+        playActionSound("jump");
+      }
+    }
+
+    function hitDamage() {
+      const now = performance.now();
+      if (now < game.damageCooldownUntil) return;
+      game.damageCooldownUntil = now + 1150;
+      game.lives -= 1;
+      if (game.lives <= 0) {
+        game.lives = 0;
+        game.ended = true;
+        game.running = false;
+        game.lastRunTick = 0;
+        stopGameplaySound();
+        playActionSound("lose");
+        showGameOverCard();
+      }
+    }
+
+    let lastTime = performance.now();
+    function animate(now) {
+      const dt = Math.min(0.033, (now - lastTime) / 1000);
+      lastTime = now;
+
+      clouds.rotation.y += dt * 0.01;
+
+      if (game.running && !game.ended) {
+        if (game.lastRunTick > 0) {
+          game.totalRunMs += Math.max(0, now - game.lastRunTick);
+        }
+        game.lastRunTick = now;
+        const levelFactor = 1 + (game.currentLevel - 1) * 0.024;
+        const speedScale = 1 + Math.min(1.45, player.position.z / Math.max(620, game.levelLength * 0.72));
+        player.position.z += game.speedZ * speedScale * dt;
+        game.targetX += game.moveX * 9 * dt;
+        game.targetX = Math.max(-LANE_LIMIT, Math.min(LANE_LIMIT, game.targetX));
+        player.position.x += (game.targetX - player.position.x) * Math.min(1, dt * 9);
+
+        game.vy -= 24 * dt;
+        player.position.y += game.vy * dt;
+        if (player.position.y <= 0) {
+          player.position.y = 0;
+          game.vy = 0;
+          game.onGround = true;
+        } else {
+          game.onGround = false;
+        }
+
+        const runT = now * 0.012;
+        const runAmp = game.onGround ? 0.48 : 0.08;
+        player.userData.armL.rotation.x = Math.sin(runT) * runAmp;
+        player.userData.armR.rotation.x = Math.sin(runT + Math.PI) * runAmp;
+        player.userData.legL.rotation.x = Math.sin(runT + Math.PI) * runAmp;
+        player.userData.legR.rotation.x = Math.sin(runT) * runAmp;
+        player.userData.shoeL.rotation.x = Math.sin(runT + Math.PI) * runAmp * 0.2;
+        player.userData.shoeR.rotation.x = Math.sin(runT) * runAmp * 0.2;
+
+        for (const coin of coins) {
+          if (!coin.visible || coin.userData.collected) continue;
+          coin.rotation.y += dt * 4;
+          coin.position.y += Math.sin(now * 0.004 + coin.position.z * 0.05) * dt * 0.7;
+
+          const targetX = player.position.x;
+          const targetY = player.position.y + 1.2;
+          const targetZ = player.position.z + 0.45;
+          let dx = targetX - coin.position.x;
+          let dy = targetY - coin.position.y;
+          let dz = targetZ - coin.position.z;
+          let dist = Math.hypot(dx, dy, dz);
+
+          if (now < game.magnetActiveUntil && dist < 14) {
+            const pull = Math.min(1, dt * (4.8 + (14 - dist) * 0.6));
+            coin.position.x += dx * pull;
+            coin.position.y += dy * pull;
+            coin.position.z += dz * pull;
+            dx = targetX - coin.position.x;
+            dy = targetY - coin.position.y;
+            dz = targetZ - coin.position.z;
+            dist = Math.hypot(dx, dy, dz);
+          }
+
+          const laneAligned = Math.abs(coin.position.x - player.position.x) < 1.25;
+          const nearForward = Math.abs(coin.position.z - player.position.z) < 1.45;
+          const justPassed = coin.position.z < player.position.z + 0.7 && coin.position.z > player.position.z - 2.1;
+          if ((laneAligned && (nearForward || justPassed)) || dist < 1.1) {
+            collectCoin(coin);
+          }
+        }
+
+        for (const enemy of enemies) {
+          if (!enemy.visible || enemy.userData.dead) continue;
+          enemy.position.x += enemy.userData.dir * enemy.userData.speed * dt * levelFactor;
+          if (enemy.position.x < -6 || enemy.position.x > 6) enemy.userData.dir *= -1;
+          const walk = now * 0.01 + enemy.userData.phase;
+          enemy.rotation.y = Math.sin(walk * 0.45) * 0.15;
+          enemy.userData.shell.position.y = 0.74 + Math.sin(walk * 1.6) * 0.03;
+          enemy.userData.head.position.z = 0.62 + Math.sin(walk * 1.2) * 0.06;
+          enemy.userData.legs[0].rotation.x = Math.sin(walk * 2.1) * 0.5;
+          enemy.userData.legs[1].rotation.x = Math.sin(walk * 2.1 + Math.PI) * 0.5;
+          enemy.userData.legs[2].rotation.x = Math.sin(walk * 2.1 + Math.PI) * 0.5;
+          enemy.userData.legs[3].rotation.x = Math.sin(walk * 2.1) * 0.5;
+
+          const dz = Math.abs(enemy.position.z - player.position.z);
+          const dx = Math.abs(enemy.position.x - player.position.x);
+          if (dz < 0.9 && dx < 0.8) {
+            if (player.position.y > 0.82 && game.vy < 0) {
+              enemy.userData.dead = true;
+              enemy.visible = false;
+              game.vy = 8.2;
+              game.scoreCoins += 5;
+              playActionSound("enemy");
+            } else {
+              hitDamage();
+            }
+          }
+        }
+
+        for (const block of blocks) {
+          if (!block.visible || block.userData.broken) continue;
+          const dz = Math.abs(block.position.z - player.position.z);
+          const dx = Math.abs(block.position.x - player.position.x);
+          if (dz < 0.95 && dx < 0.9 && player.position.y < block.userData.h + 0.2) {
+            if (player.position.y > block.userData.h + 0.18 && game.vy < 0) {
+              player.position.y = block.userData.h + 0.2;
+              game.vy = 0;
+              game.onGround = true;
+            } else {
+              hitDamage();
+              game.targetX += (player.position.x < block.position.x ? -1 : 1) * 0.8;
+            }
+          }
+        }
+
+        if (player.position.z >= game.levelLength) {
+          game.running = false;
+          game.ended = true;
+          game.won = true;
+          game.lastRunTick = 0;
+          stopGameplaySound();
+          playActionSound("win");
+          showLevelCompleteCard();
+        }
+      }
+
+      camera.position.x += (player.position.x * 0.55 - camera.position.x) * Math.min(1, dt * 4.2);
+      camera.position.y += ((5.4 + player.position.y * 0.34) - camera.position.y) * Math.min(1, dt * 4.6);
+      camera.position.z += ((player.position.z - 9.5) - camera.position.z) * Math.min(1, dt * 5.0);
+      camera.lookAt(player.position.x * 0.2, player.position.y + 1.8, player.position.z + 7);
+
+      if (performance.now() < game.damageCooldownUntil) {
+        renderer.setClearColor(0x341a22, 1);
+      } else {
+        renderer.setClearColor(0x050814, 1);
+      }
+
+      updateHud();
+      updateMagnetButton(now);
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener("resize", onResize);
+
+    let joyPointer = null;
+    const keyState = { left: false, right: false };
+    function refreshKeyboardMove() {
+      if (game.mode !== "touch" && game.mode !== "tv") return;
+      if (keyState.left && !keyState.right) {
+        game.moveX = game.mode === "touch" ? 1 : -1;
+      } else if (keyState.right && !keyState.left) {
+        game.moveX = game.mode === "touch" ? -1 : 1;
+      }
+      else game.moveX = 0;
+    }
+    function setJoy(clientX, clientY) {
+      const rect = joyBase.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const radius = rect.width * 0.36;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > radius) {
+        dx = (dx / len) * radius;
+        dy = (dy / len) * radius;
+      }
+      joyKnob.style.transform = "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px))";
+      game.moveX = Math.max(-1, Math.min(1, -dx / radius));
+    }
+    function resetJoy() {
+      joyKnob.style.transform = "translate(-50%, -50%)";
+      refreshKeyboardMove();
+      joyPointer = null;
+    }
+
+    joyBase.addEventListener("pointerdown", (e) => {
+      if (game.mode !== "touch") return;
+      joyPointer = e.pointerId;
+      setJoy(e.clientX, e.clientY);
+      joyBase.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    joyBase.addEventListener("pointermove", (e) => {
+      if (game.mode !== "touch") return;
+      if (joyPointer !== e.pointerId) return;
+      setJoy(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    joyBase.addEventListener("pointerup", (e) => {
+      if (joyPointer !== e.pointerId) return;
+      resetJoy();
+    });
+    joyBase.addEventListener("pointercancel", (e) => {
+      if (joyPointer !== e.pointerId) return;
+      resetJoy();
+    });
+
+    jumpBtn.addEventListener("pointerdown", (e) => {
+      jump();
+      e.preventDefault();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "Enter" || e.code === "NumpadEnter") {
+        jump();
+        e.preventDefault();
+        return;
+      }
+      if (e.code === "ArrowLeft" || e.code === "KeyA") {
+        keyState.left = true;
+        refreshKeyboardMove();
+        e.preventDefault();
+        return;
+      }
+      if (e.code === "ArrowRight" || e.code === "KeyD") {
+        keyState.right = true;
+        refreshKeyboardMove();
+        e.preventDefault();
+      }
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") {
+        keyState.left = false;
+        refreshKeyboardMove();
+        e.preventDefault();
+        return;
+      }
+      if (e.code === "ArrowRight" || e.code === "KeyD") {
+        keyState.right = false;
+        refreshKeyboardMove();
+        e.preventDefault();
+      }
+    });
+
+    let hands = null;
+    let handCamera = null;
+    let handPinched = false;
+    let pinchReleaseCooldownUntil = 0;
+
+    function stopHandMode() {
+      game.handActive = false;
+      game.moveX = 0;
+      handPinched = false;
+      if (handCamera) {
+        handCamera.stop();
+      }
+      camPreview.style.display = "none";
+    }
+
+    async function startHandMode() {
+      if (!window.Hands || !window.Camera) {
+        alert("Camera hand tracking scripts not loaded.");
+        return;
+      }
+      if (!hands) {
+        hands = new Hands({
+          locateFile: (file) => "https://cdn.jsdelivr.net/npm/@mediapipe/hands/" + file
+        });
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6
+        });
+        hands.onResults((results) => {
+          if (game.mode !== "hand") return;
+          const lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
+          if (!lm) {
+            game.handActive = false;
+            game.moveX = 0;
+            handPinched = false;
+            return;
+          }
+          game.handActive = true;
+          const index = lm[8];
+          const thumb = lm[4];
+          const fingerX = index.x * 2 - 1;
+          game.moveX = Math.max(-1, Math.min(1, fingerX * game.handSensitivity));
+          game.targetX += game.moveX * 0.58;
+
+          const pinch = Math.hypot(index.x - thumb.x, index.y - thumb.y);
+          const now = performance.now();
+          const joinThreshold = 0.052;
+          const releaseThreshold = 0.078;
+          if (pinch < joinThreshold) {
+            handPinched = true;
+          } else if (handPinched && pinch > releaseThreshold && now > pinchReleaseCooldownUntil) {
+            handPinched = false;
+            pinchReleaseCooldownUntil = now + 220;
+            jump();
+          }
+        });
+      }
+
+      if (!handCamera) {
+        handCamera = new Camera(camPreview, {
+          onFrame: async () => {
+            if (game.mode === "hand") {
+              await hands.send({ image: camPreview });
+            }
+          },
+          width: 640,
+          height: 360
+        });
+      }
+
+      camPreview.style.display = "block";
+      await handCamera.start();
+    }
+
+    function setTouchMode() {
+      game.mode = "touch";
+      playModeSound("touch");
+      modeStatusEl.textContent = "Touch";
+      stopHandMode();
+      refreshKeyboardMove();
+      syncControlVisibility();
+      modePicker.style.display = "none";
+      resetGame();
+    }
+
+    async function setHandMode() {
+      game.mode = "hand";
+      syncControlVisibility();
+      modeStatusEl.textContent = "Searching...";
+      try {
+        await startHandMode();
+        playModeSound("hand");
+        modePicker.style.display = "none";
+        resetGame();
+      } catch (_err) {
+        game.mode = "touch";
+        syncControlVisibility();
+        refreshKeyboardMove();
+        alert("Camera access failed. Please allow camera and try again.");
+      }
+    }
+
+    function setTvMode() {
+      game.mode = "tv";
+      playModeSound("tv");
+      stopHandMode();
+      refreshKeyboardMove();
+      syncControlVisibility();
+      modePicker.style.display = "none";
+      resetGame();
+    }
+
+    changeModeBtn.addEventListener("click", () => {
+      game.running = false;
+      game.lastRunTick = 0;
+      stopGameplaySound();
+      if (game.mode === "hand") {
+        stopHandMode();
+      }
+      modePicker.style.display = "flex";
+      centerCard.style.display = "none";
+    });
+
+    pickTouchBtn.addEventListener("click", setTouchMode);
+    pickHandBtn.addEventListener("click", () => {
+      setHandMode();
+    });
+    pickTvBtn.addEventListener("click", setTvMode);
+
+    restartBtn.addEventListener("click", () => {
+      stopGameplaySound();
+      resetGame();
+    });
+    magnetBtn.addEventListener("click", () => {
+      activateMagnet();
+    });
+    resetGame();
+    modePicker.style.display = "flex";
+    centerCard.style.display = "none";
+  </script>
+</body>
+</html>
